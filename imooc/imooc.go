@@ -3,6 +3,7 @@ package imooc
 import (
 	"fmt"
 	"imooc_downloader/tools"
+	"strconv"
 
 	"github.com/go-resty/resty/v2"
 )
@@ -12,6 +13,7 @@ const (
 	SHOW_VERIFY_URL = "https://www.imooc.com/passport/user/loginverifyshow"
 	LOGIN_URL       = "https://www.imooc.com/passport/user/login"
 	BROWSER_KEY     = "dd9eeccdd46ca5935707f07fef4ba2fb"
+	DECRYPT_URL     = "http://34.80.19.136:58000/decrypt"
 )
 
 var referer = "https://www.imooc.com"
@@ -22,49 +24,50 @@ type UserManger struct {
 }
 
 func (u *UserManger) DoLogin() error {
-
 	preBody, err := ready()
 	if err != nil {
 		return err
 	}
-
-	preMsg := new(PreLoginResponse)
-	tools.Parser(preBody, preMsg)
-
-	fmt.Printf(
-		`code: %v
-pubkey: %v
-server time: %v
-status: %v`,
-		preMsg.Code, preMsg.PubKey, preMsg.ServerTime, preMsg.Status)
-	fmt.Println()
+	premsg := new(PreLoginResponse)
+	tools.Parser(preBody, premsg)
 
 	verBody, err := verify(u.Username)
 	if err != nil {
 		return err
 	}
+	vermsg := new(VerifyResponse)
+	tools.Parser(verBody, vermsg)
 
-	verMsg := new(VerifyResponse)
-	tools.Parser(verBody, verMsg)
+	form, err := u.createLoginForm(premsg)
+	if err != nil {
+		return err
+	}
 
-	fmt.Printf(
-		`msg: %v
-need verify code ?: %v`,
-		verMsg.Msg, verMsg.Status == 10001)
-	fmt.Println()
+	submitForm(form)
 
-	signInForm := map[string]string{
+	return nil
+}
+
+func (u *UserManger) createLoginForm(premsg *PreLoginResponse) (map[string]string, error) {
+	// 请求解密 code servertime password 并且 base64
+	str := premsg.Code + "\t" + strconv.Itoa(premsg.ServerTime) + "\t" + u.Password
+	pw, err := handleDecryptPw(str)
+	if err != nil {
+		return nil, err
+	}
+
+	// 再修改
+	form := map[string]string{
 		"username":    u.Username,
-		"password":    "SFHIkqckHWxZb/qJp1tRZEUVkJJCJ3CBLxy18rYJ1GqF7MD+e8B7Gkwud1P//NhIncgrzBA6SOAHVm9A/B28Df+QfENVZNK1Z7Z+8yBtR+ceUioFWyJhxPHrBXDOSqG95KCDMHjbJdF+zC5z26/d5O1xWKX53M5+Jlgb+z2mjy4=",
+		"password":    string(pw),
 		"verify":      "",
 		"remember":    "1",
 		"pwencode":    "1",
 		"browser_key": BROWSER_KEY,
 		"referer":     referer,
 	}
-	signIn(signInForm)
 
-	return nil
+	return form, nil
 }
 
 func ready() ([]byte, error) {
@@ -91,7 +94,7 @@ func verify(user string) ([]byte, error) {
 	return resp.Body(), nil
 }
 
-func signIn(data map[string]string) {
+func submitForm(data map[string]string) {
 	client := resty.New()
 	resp, err := client.R().
 		SetHeaders(Headers).
@@ -104,4 +107,13 @@ func signIn(data map[string]string) {
 	}
 
 	fmt.Printf("%v \n", resp)
+}
+
+func handleDecryptPw(str string) ([]byte, error) {
+	client := resty.New()
+	resp, err := client.R().SetHeader("Content-type", "application/json").SetBody(map[string]interface{}{"pw": str}).Post(DECRYPT_URL)
+	if err != nil {
+		return nil, fmt.Errorf("request decrypt password failed. error: %v", err)
+	}
+	return resp.Body(), nil
 }
