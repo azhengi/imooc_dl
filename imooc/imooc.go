@@ -23,29 +23,51 @@ type UserManger struct {
 	Password string
 }
 
-func (u *UserManger) DoLogin() error {
+func (u *UserManger) DoLogin() (string, error) {
 	preBody, err := ready()
 	if err != nil {
-		return err
+		return "", err
 	}
 	premsg := new(PreLoginResponse)
 	tools.Parser(preBody, premsg)
 
 	verBody, err := verify(u.Username)
 	if err != nil {
-		return err
+		return "", err
 	}
 	vermsg := new(VerifyResponse)
 	tools.Parser(verBody, vermsg)
 
 	form, err := u.createLoginForm(premsg)
 	if err != nil {
-		return err
+		return "", err
 	}
 
-	submitForm(form)
+	subBody, err := submitForm(form)
+	if err != nil {
+		return "", err
+	}
+	lgmsg := new(LoginResponse)
+	tools.Parser(subBody, lgmsg)
+	if lgmsg.Status != 10001 {
+		return "", fmt.Errorf(lgmsg.Msg)
+	}
 
-	return nil
+	urls, ok := lgmsg.Data["url"]
+	if !ok {
+		return "", fmt.Errorf("Field url does not exist.")
+	}
+	val, ok := urls.([]interface{})
+	if !ok {
+		return "", fmt.Errorf("Assertion url failed.")
+	}
+
+	url, ok := val[0].(string)
+	if !ok {
+		return "", fmt.Errorf("Assertion url[0] failed.")
+	}
+
+	return url, nil
 }
 
 func (u *UserManger) createLoginForm(premsg *PreLoginResponse) (map[string]string, error) {
@@ -94,7 +116,7 @@ func verify(user string) ([]byte, error) {
 	return resp.Body(), nil
 }
 
-func submitForm(data map[string]string) {
+func submitForm(data map[string]string) ([]byte, error) {
 	client := resty.New()
 	resp, err := client.R().
 		SetHeaders(Headers).
@@ -103,10 +125,10 @@ func submitForm(data map[string]string) {
 
 	if err != nil {
 		fmt.Printf("failed error: %v\n", err)
-		return
+		return nil, err
 	}
 
-	fmt.Printf("%v \n", resp)
+	return resp.Body(), nil
 }
 
 func handleDecryptPw(str string) ([]byte, error) {
