@@ -17,10 +17,11 @@ require (
 	github.com/kennygrant/sanitize v1.2.4 // indirect
 	github.com/kr/pretty v0.1.0 // indirect
 	github.com/otiai10/gosseract/v2 v2.2.4
+	github.com/pkg/errors v0.9.1 // indirect
 	github.com/saintfish/chardet v0.0.0-20120816061221-3af4cd4741ca // indirect
 	github.com/stretchr/testify v1.4.0 // indirect
 	github.com/temoto/robotstxt v1.1.1 // indirect
-	golang.org/x/net v0.0.0-20200822124328-c89045814202 // indirect
+	golang.org/x/net v0.0.0-20200822124328-c89045814202
 	golang.org/x/xerrors v0.0.0-20200804184101-5ec99f83aff1 // indirect
 	google.golang.org/appengine v1.6.6 // indirect
 	google.golang.org/protobuf v1.24.0 // indirect
