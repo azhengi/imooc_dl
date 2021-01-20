@@ -2,16 +2,16 @@ package tools
 
 import (
 	"bytes"
+	"crypto/aes"
+	"crypto/cipher"
 	"encoding/json"
 	"fmt"
+	"imooc_downloader/config"
 	"io"
 	"net/http"
+	"strconv"
 	"time"
 )
-
-var NormalClientHeader = map[string]string{
-	"User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/81.0.4044.113 Safari/537.36",
-}
 
 func Get(u string, params map[string]string) (io.ReadCloser, error) {
 	c := http.Client{Timeout: time.Second * time.Duration(30)}
@@ -22,7 +22,7 @@ func Get(u string, params map[string]string) (io.ReadCloser, error) {
 	}
 	request.URL.RawQuery = values.Encode()
 
-	for k, v := range NormalClientHeader {
+	for k, v := range config.FakeHeaders {
 		request.Header.Add(k, v)
 	}
 
@@ -53,4 +53,30 @@ func DecryptResponseInfo() {
 func Parser(body []byte, v interface{}) error {
 	decode := json.NewDecoder(bytes.NewBuffer(body))
 	return decode.Decode(v)
+}
+
+func Aes128Decrypt(crypted, key, iv []byte) ([]byte, error) {
+	block, err := aes.NewCipher(key)
+	if err != nil {
+		return nil, err
+	}
+	blockSize := block.BlockSize()
+	if len(iv) == 0 {
+		iv = key
+	}
+	blockMode := cipher.NewCBCDecrypter(block, iv[:blockSize])
+	origData := make([]byte, len(crypted))
+	blockMode.CryptBlocks(origData, crypted)
+	origData = Pkcs5UnPadding(origData)
+	return origData, nil
+}
+
+func Pkcs5UnPadding(origData []byte) []byte {
+	length := len(origData)
+	unPadding := int(origData[length-1])
+	return origData[:(length - unPadding)]
+}
+
+func JoinAccessURL(ssourl string) string {
+	return ssourl + "&callback=jQuery19109012039733904491_" + strconv.Itoa(int(time.Now().UnixNano())/1e6) + "&_=" + strconv.Itoa(int(time.Now().UnixNano())/1e6+2)
 }

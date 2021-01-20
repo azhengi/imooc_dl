@@ -1,20 +1,77 @@
 package main
 
 import (
+	"errors"
 	"fmt"
 	"imooc_downloader/crawler"
 	"imooc_downloader/imooc"
+	"regexp"
+	"strings"
+
+	"github.com/manifoldco/promptui"
 )
 
+var storageFolder string
+var emailReStr string = `^[a-zA-Z0-9_-]+@[a-zA-Z0-9_-]+(\.[a-zA-Z0-9_-]+)+$`
+var phoneReStr string = `^1(3\d|4[5-8]|5[0-35-9]|6[567]|7[01345-8]|8\d|9[025-9])\d{8}$`
+
+var accountValidate = func(input string) error {
+	trimStr := strings.Trim(input, " \n")
+	emailMatched, _ := regexp.MatchString(emailReStr, trimStr)
+	if emailMatched {
+		return nil
+	}
+
+	phoneMatched, _ := regexp.MatchString(phoneReStr, trimStr)
+	if phoneMatched {
+		return nil
+	}
+
+	return errors.New("Invalid imooc account")
+}
+
+var pwdValidate = func(input string) error {
+	return nil
+}
+
 func main() {
+	// flag.StringVar(&storageFolder, "storage", "./download", "a download save path")
+	// flag.Parse()
+	accountPrompt := promptui.Prompt{
+		Label:       "账号",
+		Validate:    accountValidate,
+		HideEntered: true,
+	}
+
+	acc, err := accountPrompt.Run()
+	if err != nil {
+		fmt.Printf("account Prompt failed %v\n", err)
+		return
+	}
+
+	pwdPrompt := promptui.Prompt{
+		Label:       "密码",
+		Validate:    pwdValidate,
+		Mask:        '*',
+		HideEntered: true,
+	}
+	pwd, err := pwdPrompt.Run()
+	if err != nil {
+		fmt.Printf("password Prompt failed %v\n", err)
+		return
+	}
+
 	um := new(imooc.UserManger)
-	um.Username = "" // phone or email to login
-	um.Password = ""
-	ssourl, err := um.DoLogin()
+	um.Username = acc // phone or email to login
+	um.Password = pwd
+	err = um.DoLogin()
 	if err != nil {
 		fmt.Printf("run DoLogin failed. error: %v\n", err)
 		return
 	}
 
-	crawler.StarColly(ssourl)
+	// do crawl
+	crawler.StarColly("https://coding.imooc.com/learn/list/351.html")
+
+	// m3u8dl_cli.Run("xx.m3u8")
 }
