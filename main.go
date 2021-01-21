@@ -61,6 +61,16 @@ func main() {
 		return
 	}
 
+	coursePrompt := promptui.Prompt{
+		Label: "课程链接( 暂不支持免费课程下载 )",
+	}
+
+	course, err := coursePrompt.Run()
+	if err != nil {
+		fmt.Printf("course Prompt failed %v\n", err)
+		return
+	}
+
 	um := new(imooc.UserManger)
 	um.Username = acc // phone or email to login
 	um.Password = pwd
@@ -71,7 +81,7 @@ func main() {
 	}
 
 	// do crawl
-	crawler.StarColly("https://coding.imooc.com/learn/list/351.html")
+	crawler.StarColly(course)
 
 	// m3u8dl_cli.Run("xx.m3u8")
 }
