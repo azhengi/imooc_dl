@@ -2,11 +2,10 @@ package crawler
 
 import (
 	"fmt"
+	"imooc_downloader/dl"
 	"imooc_downloader/imooc"
-	"io/ioutil"
 	"log"
 	"net/url"
-	"os"
 	"regexp"
 	"strings"
 
@@ -17,6 +16,8 @@ import (
 
 var lessonRe = regexp.MustCompile(`\/lesson\/(\d+)\.html#mid=(\d+)`)
 
+var courseTitle string = ""
+
 func StarColly(url string) {
 
 	c := colly.NewCollector(
@@ -24,8 +25,15 @@ func StarColly(url string) {
 	)
 
 	ch := make(chan Lesson)
+	ownTitleCh := make(chan struct{})
 
 	c.SetCookies("https://www.imooc.com", imooc.AuthCookies)
+
+	c.OnHTML("h2[class=course-title]", func(e *colly.HTMLElement) {
+		courseTitle = strings.Trim(e.Text, " \n")
+		ownTitleCh <- struct{}{}
+		fmt.Println(e.Text)
+	})
 
 	c.OnHTML("div[class=list-item]", func(e *colly.HTMLElement) {
 		var chapter string
@@ -58,30 +66,45 @@ func StarColly(url string) {
 
 	c.OnResponse(func(r *colly.Response) {
 		log.Println("response received", r.StatusCode)
-		// log.Println("response received Body", string(r.Body))
-		// ioutil.WriteFile("./imooc_coding.html", r.Body, os.ModePerm)
 	})
 
 	c.OnError(func(_ *colly.Response, err error) {
 		log.Println("Something went wrong:", err)
 	})
 
-	go requestLesson(ch)
+	go requestLesson(ownTitleCh, ch)
 
 	c.Visit(url)
 }
 
-func requestLesson(dataChan chan Lesson) {
+func requestLesson(ownTitleCh chan struct{}, dataChan chan Lesson) {
+	<-ownTitleCh
+	// storeageAbs, _ := filepath.Abs(StorageFolder)
+	// courseFolder := filepath.Join(storeageAbs, courseTitle)
+	// err := os.MkdirAll(courseFolder, os.ModePerm)
+	// if err != nil {
+	// 	fmt.Printf("MkdirAll courseFolder failed. %v", err)
+	// 	return
+	// }
+
 	for {
-		func() {
-			select {
-			case lesson := <-dataChan:
-				mediapl := m3u8Parser(lesson.m3u8)
-				// os.MkdirAll(lesson.chapter, os.ModePerm)
-				normalName := strings.Replace(lesson.title, ":", "_", -1)
-				ioutil.WriteFile(normalName+".m3u8", mediapl.Encode().Bytes(), os.ModePerm)
-			}
-		}()
+
+		select {
+		case lesson := <-dataChan:
+			fmt.Println(lesson.title)
+			// chapterFolder := filepath.Join(courseFolder, lesson.chapter)
+			// err := os.MkdirAll(chapterFolder, os.ModePerm)
+			// if err != nil {
+			// 	fmt.Printf("MkdirAll chapterFolder failed. %v", err)
+			// 	continue
+			// }
+			mediapl := m3u8Parser(lesson.m3u8)
+			normalName := strings.Replace(lesson.title, ":", "_", -1)
+			en := dl.NewEnginer(normalName, mediapl)
+			en.Download()
+			// m3u8File := filepath.Join(chapterFolder, normalName+".m3u8")
+			// ioutil.WriteFile(m3u8File, mediapl.Encode().Bytes(), os.ModePerm)
+		}
 	}
 }
 

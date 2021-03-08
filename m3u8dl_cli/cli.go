@@ -9,7 +9,7 @@ import (
 	"os/exec"
 )
 
-const CLI_PATH = "./N_m3u8DL-CLI_v2.9.1.exe"
+const CLI_PATH = "./N_m3u8DL-CLI_v2.9.4.exe"
 
 func checkCLIExists() (bool, error) {
 	_, err := os.Stat(CLI_PATH)
@@ -24,7 +24,8 @@ func Run(filename string) {
 	if exist {
 		line := CLI_PATH + " " + filename
 		var stdoutBuf, stderrBuf bytes.Buffer
-		cmd := exec.Command("cmd", "/c", "start "+line)
+		cmd := exec.Command("cmd", "/c", "start "+line+" --noGui")
+
 		// cmd := exec.Command("cmd")
 
 		// stdin, _ := cmd.StdinPipe()
@@ -40,7 +41,7 @@ func Run(filename string) {
 			log.Fatalf("cmd.Start() failed with '%s'\n", err)
 		}
 
-		go func() {
+		func() {
 			_, errStdout = io.Copy(stdout, stdoutIn)
 		}()
 		go func() {
@@ -50,12 +51,10 @@ func Run(filename string) {
 		// io.WriteString(stdin, "index.m3u8")
 		// stdin.Close()
 
-		defer func() {
-			err = cmd.Wait()
-			if err != nil {
-				log.Fatalf("cmd.Run() failed with %s\n", err)
-			}
-		}()
+		err = cmd.Wait()
+		if err != nil {
+			log.Fatalf("cmd.Run() failed with %s\n", err)
+		}
 
 		if errStdout != nil || errStderr != nil {
 			log.Fatal("failed to capture stdout or stderr\n")

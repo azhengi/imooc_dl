@@ -11,7 +11,6 @@ import (
 	"github.com/manifoldco/promptui"
 )
 
-var storageFolder string
 var emailReStr string = `^[a-zA-Z0-9_-]+@[a-zA-Z0-9_-]+(\.[a-zA-Z0-9_-]+)+$`
 var phoneReStr string = `^1(3\d|4[5-8]|5[0-35-9]|6[567]|7[01345-8]|8\d|9[025-9])\d{8}$`
 
@@ -35,8 +34,6 @@ var pwdValidate = func(input string) error {
 }
 
 func main() {
-	// flag.StringVar(&storageFolder, "storage", "./download", "a download save path")
-	// flag.Parse()
 	accountPrompt := promptui.Prompt{
 		Label:       "账号",
 		Validate:    accountValidate,
@@ -62,7 +59,8 @@ func main() {
 	}
 
 	coursePrompt := promptui.Prompt{
-		Label: "课程链接( 暂不支持免费课程下载 )",
+		Label:   "课程链接( 暂不支持免费课程下载 )",
+		Default: "https://coding.imooc.com/learn/list/99.html",
 	}
 
 	course, err := coursePrompt.Run()
@@ -83,5 +81,4 @@ func main() {
 	// do crawl
 	crawler.StarColly(course)
 
-	// m3u8dl_cli.Run("xx.m3u8")
 }

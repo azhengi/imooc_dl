@@ -2,9 +2,13 @@ package crawler
 
 import (
 	"bytes"
+	"encoding/base64"
+	"imooc_downloader/common"
 	"imooc_downloader/config"
 	"imooc_downloader/imooc"
 	"imooc_downloader/tools"
+	"regexp"
+	"strconv"
 
 	"github.com/go-resty/resty/v2"
 	"github.com/grafov/m3u8"
@@ -24,33 +28,38 @@ import (
 https://github.com/nilaoda/N_m3u8DL-CLI
 
 */
+
+var valueRe = regexp.MustCompile(`:(\d+)`)
+
 func m3u8Parser(url string) *m3u8.MediaPlaylist {
 
 	content := decryptURL(url, "")
 	p, listType, _ := m3u8.DecodeFrom(bytes.NewReader(content), true)
 
 	for listType == m3u8.MASTER {
-		masterpl := p.(*m3u8.MasterPlaylist)
+		masterpl, _ := p.(*m3u8.MasterPlaylist)
 		variant := getMaxOfSlice(masterpl.Variants)
+		// 获取指定清晰度 m3u8 url . variant.URI
 		content := decryptURL(variant.URI, "")
 		p, listType, _ = m3u8.DecodeFrom(bytes.NewReader(content), true)
 	}
 
-	mediapl := p.(*m3u8.MediaPlaylist)
-	if mediapl.Key != nil {
-		// keyByte := decryptURL(mediapl.Key.URI, "1")
-		// strKey := string(keyByte)
-		/* for _, v := range strKey {
-			fmt.Printf("%+v", string(v))
-		} */
-		// fmt.Printf("%+v\n ", string(strKey))
-		// fmt.Printf("%+v\n", mediapl)
-		// normalName := strings.Replace(name, ":", "_", -1)
-		// ioutil.WriteFile(normalName+".m3u8", mediapl.Encode().Bytes(), os.ModePerm)
-		return mediapl
+	mediapl, _ := p.(*m3u8.MediaPlaylist)
+	segDecodeKey := ""
+	for _, seg := range mediapl.Segments {
+		if seg == nil {
+			continue
+		}
+		if seg.Key != nil {
+			segDecodeKey = keyParser(seg.Key.URI)
+		}
+		if seg.Custom == nil {
+			seg.Custom = make(map[string]m3u8.CustomTag)
+		}
+		seg.Custom[common.KEY_CONTENT_TAG] = imoocKey(segDecodeKey)
 	}
 
-	return nil
+	return mediapl
 }
 
 func decryptURL(url, e string) []byte {
@@ -58,9 +67,24 @@ func decryptURL(url, e string) []byte {
 	client.SetCookies(imooc.AuthCookies)
 
 	resp, _ := client.R().SetHeaders(imooc.Headers).Get(url)
-	pl := new(m3uResponse)
+	pl := new(decryptMsg)
 	tools.Parser(resp.Body(), pl)
 	info := pl.Data["info"]
 	resp, _ = client.R().SetHeader("Content-type", "application/json").SetBody(map[string]interface{}{"info": info, "e": e}).Post(config.DECRYPT_INFO_URL)
 	return resp.Body()
+}
+
+func keyParser(uri string) string {
+	content := decryptURL(uri, "1")
+	str := string(content)
+	matches := valueRe.FindAllStringSubmatch(str, -1)
+	values := make([]byte, 0, 16)
+
+	for _, v := range matches {
+		val, _ := strconv.ParseInt(v[1], 10, 64)
+		values = append(values, byte(val))
+	}
+
+	encodeString := base64.StdEncoding.EncodeToString(values)
+	return encodeString
 }
