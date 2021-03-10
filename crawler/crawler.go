@@ -79,31 +79,14 @@ func StarColly(url string) {
 
 func requestLesson(ownTitleCh chan struct{}, dataChan chan Lesson) {
 	<-ownTitleCh
-	// storeageAbs, _ := filepath.Abs(StorageFolder)
-	// courseFolder := filepath.Join(storeageAbs, courseTitle)
-	// err := os.MkdirAll(courseFolder, os.ModePerm)
-	// if err != nil {
-	// 	fmt.Printf("MkdirAll courseFolder failed. %v", err)
-	// 	return
-	// }
-
+	en := dl.NewEnginer(courseTitle)
 	for {
 
 		select {
 		case lesson := <-dataChan:
-			fmt.Println(lesson.title)
-			// chapterFolder := filepath.Join(courseFolder, lesson.chapter)
-			// err := os.MkdirAll(chapterFolder, os.ModePerm)
-			// if err != nil {
-			// 	fmt.Printf("MkdirAll chapterFolder failed. %v", err)
-			// 	continue
-			// }
 			mediapl := m3u8Parser(lesson.m3u8)
 			normalName := strings.Replace(lesson.title, ":", "_", -1)
-			en := dl.NewEnginer(normalName, mediapl)
-			en.Download()
-			// m3u8File := filepath.Join(chapterFolder, normalName+".m3u8")
-			// ioutil.WriteFile(m3u8File, mediapl.Encode().Bytes(), os.ModePerm)
+			en.Download(lesson.chapter, normalName, mediapl)
 		}
 	}
 }

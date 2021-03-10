@@ -27,5 +27,3 @@ func (ik imoocKey) Encode() *bytes.Buffer {
 func (ik imoocKey) String() string {
 	return string(ik)
 }
-
-var StorageFolder string = "./storage"

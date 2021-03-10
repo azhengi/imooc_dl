@@ -9,6 +9,7 @@ import (
 	"io/ioutil"
 	"net/http"
 	"os"
+	"os/exec"
 	"path/filepath"
 	"strconv"
 	"time"
@@ -25,34 +26,33 @@ import (
 
 */
 
-var dstFolder = "./dl_dst"
+var dstFolder = "./download"
 
 type Enginer struct {
-	name    string
+	course  string
 	mediapl *m3u8.MediaPlaylist
 }
 
-func NewEnginer(name string, mediapl *m3u8.MediaPlaylist) *Enginer {
-	return &Enginer{name: name, mediapl: mediapl}
+func NewEnginer(course string) *Enginer {
+	return &Enginer{course: course}
 }
 
-func (en *Enginer) Download() {
+func (en *Enginer) Download(chapter, name string, mediapl *m3u8.MediaPlaylist) {
 
 	c := http.Client{
 		Timeout: time.Duration(30) * time.Second,
 	}
 
-	dstAbs, _ := filepath.Abs(dstFolder)
-	segmentsFolder := filepath.Join(dstAbs, en.name, "segments")
-	os.MkdirAll(segmentsFolder, os.ModePerm)
+	course, _ := filepath.Abs(filepath.Join(dstFolder, en.course))
+	segTemp := filepath.Join(course, chapter, name+"-"+time.Now().Format("20060102150405"))
+	os.MkdirAll(segTemp, os.ModePerm)
 
-	uiprogress.Start()
-	bar := uiprogress.AddBar(int(en.mediapl.Count()))
+	up := uiprogress.New()
+	up.Start()
+	bar := up.AddBar(int(mediapl.Count()))
 	bar.AppendCompleted()
-	bar.PrependElapsed()
-	pgs := 1
 
-	for index, seg := range en.mediapl.Segments {
+	for index, seg := range mediapl.Segments {
 		if seg == nil {
 			break
 		}
@@ -71,15 +71,53 @@ func (en *Enginer) Download() {
 		tag := seg.Custom[common.KEY_CONTENT_TAG]
 		tagBytes, err := base64.StdEncoding.DecodeString(tag.String())
 
-		iv := int64(en.mediapl.SeqNo + uint64(index))
+		iv := int64(mediapl.SeqNo + uint64(index))
 		ivHex := fmt.Sprintf("%016x", iv)
 		hx, _ := hex.DecodeString(ivHex)
 		decryptedBytes, err := tools.Aes128Decrypt(byteslice, tagBytes, hx)
 
-		tsFile := filepath.Join(segmentsFolder, strconv.Itoa(index)+".ts")
+		tsFile := filepath.Join(segTemp, strconv.Itoa(index)+".ts")
 
 		ioutil.WriteFile(tsFile, decryptedBytes, os.ModePerm)
-		bar.Set(pgs)
-		pgs++
+		bar.Incr()
+	}
+	up.Stop()
+	mergeRename(segTemp)
+}
+
+func mergeRename(src string) {
+
+	if _, err := exec.LookPath("ffmpeg"); err == nil {
+		files, err := ioutil.ReadDir(src)
+		if err != nil {
+			fmt.Printf("ReadDir failed. %v\n", err)
+		}
+
+		var line []byte = []byte{}
+		fileCount := len(files)
+
+		for index := range files {
+			if index == fileCount-1 {
+				line = append(line, []byte(src+"\\"+strconv.Itoa(index)+".ts")...)
+			} else {
+				line = append(line, []byte(src+"\\"+strconv.Itoa(index)+".ts"+"|")...)
+			}
+		}
+
+		target := src + ".mp4"
+		cmd := exec.Command("ffmpeg",
+			"-i", "concat:"+string(line),
+			"-acodec", "copy",
+			"-vcodec", "copy",
+			"-absf", "aac_adtstoasc",
+			target,
+		)
+		err = cmd.Run()
+		if err != nil {
+			fmt.Printf("%v", err)
+		}
+
+	} else {
+		fmt.Println("FFmpeg does not exist! skip merge")
 	}
 }

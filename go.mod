@@ -22,6 +22,7 @@ require (
 	github.com/grafov/m3u8 v0.11.1
 	github.com/kennygrant/sanitize v1.2.4 // indirect
 	github.com/kr/pretty v0.1.0 // indirect
+	github.com/manifoldco/promptui v0.8.0 // indirect
 	github.com/mattn/go-isatty v0.0.4 // indirect
 	github.com/otiai10/gosseract/v2 v2.2.4
 	github.com/saintfish/chardet v0.0.0-20120816061221-3af4cd4741ca // indirect
