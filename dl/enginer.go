@@ -7,7 +7,6 @@ import (
 	"imooc_downloader/common"
 	"imooc_downloader/tools"
 	"io/ioutil"
-	"net/http"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -37,9 +36,9 @@ func NewEnginer(course string) *Enginer {
 
 func (en *Enginer) Download(chapter, name string, mediapl *m3u8.MediaPlaylist) {
 
-	c := http.Client{
-		Timeout: time.Duration(30) * time.Second,
-	}
+	// c := http.Client{
+	// 	Timeout: time.Duration(30) * time.Second,
+	// }
 
 	course, _ := filepath.Abs(filepath.Join(en.dstFolder, en.course))
 	segTemp := filepath.Join(course, chapter, name+"-"+time.Now().Format("20060102150405"))
@@ -55,16 +54,24 @@ func (en *Enginer) Download(chapter, name string, mediapl *m3u8.MediaPlaylist) {
 			break
 		}
 
-		resp, err := c.Get(seg.URI)
+		// resp, err := c.Get(seg.URI)
+		// if err != nil {
+		// 	return
+		// }
+		// if resp.StatusCode != 200 {
+		// 	return
+		// }
+
+		// byteslice, _ := ioutil.ReadAll(resp.Body)
+		// resp.Body.Close()
+		d := Download{
+			Url:           seg.URI,
+			TotalSections: 5,
+		}
+		byteslice, err := d.Do()
 		if err != nil {
 			return
 		}
-		if resp.StatusCode != 200 {
-			return
-		}
-
-		byteslice, _ := ioutil.ReadAll(resp.Body)
-		resp.Body.Close()
 
 		tag := seg.Custom[common.KEY_CONTENT_TAG]
 		tagBytes, err := base64.StdEncoding.DecodeString(tag.String())
