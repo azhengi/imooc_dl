@@ -26,15 +26,13 @@ import (
 
 */
 
-var dstFolder = "./download"
-
 type Enginer struct {
-	course  string
-	mediapl *m3u8.MediaPlaylist
+	course    string
+	dstFolder string
 }
 
 func NewEnginer(course string) *Enginer {
-	return &Enginer{course: course}
+	return &Enginer{course: course, dstFolder: "./download"}
 }
 
 func (en *Enginer) Download(chapter, name string, mediapl *m3u8.MediaPlaylist) {
@@ -43,7 +41,7 @@ func (en *Enginer) Download(chapter, name string, mediapl *m3u8.MediaPlaylist) {
 		Timeout: time.Duration(30) * time.Second,
 	}
 
-	course, _ := filepath.Abs(filepath.Join(dstFolder, en.course))
+	course, _ := filepath.Abs(filepath.Join(en.dstFolder, en.course))
 	segTemp := filepath.Join(course, chapter, name+"-"+time.Now().Format("20060102150405"))
 	os.MkdirAll(segTemp, os.ModePerm)
 
@@ -114,9 +112,13 @@ func mergeRename(src string) {
 		)
 		err = cmd.Run()
 		if err != nil {
-			fmt.Printf("%v", err)
+			fmt.Printf("FFmpeg run command failed. %v\n", err)
 		}
 
+		err = os.RemoveAll(src)
+		if err != nil {
+			fmt.Printf("Remove temp failed. %v\n", err)
+		}
 	} else {
 		fmt.Println("FFmpeg does not exist! skip merge")
 	}
