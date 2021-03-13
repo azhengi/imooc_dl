@@ -10,6 +10,7 @@ import (
 	"os"
 	"strconv"
 	"sync"
+	"time"
 )
 
 type Download struct {
@@ -24,7 +25,12 @@ func (d Download) Do() ([]byte, error) {
 	if err != nil {
 		return nil, err
 	}
-	resp, err := http.DefaultClient.Do(r)
+
+	client := http.Client{
+		Timeout: time.Duration(30) * time.Second,
+	}
+
+	resp, err := client.Do(r)
 	if err != nil {
 		return nil, err
 	}
@@ -86,7 +92,10 @@ func (d Download) downloadSection(i int, c [2]int) error {
 		return err
 	}
 	r.Header.Set("Range", fmt.Sprintf("bytes=%v-%v", c[0], c[1]))
-	resp, err := http.DefaultClient.Do(r)
+	client := http.Client{
+		Timeout: time.Duration(30) * time.Second,
+	}
+	resp, err := client.Do(r)
 	if err != nil {
 		return err
 	}
