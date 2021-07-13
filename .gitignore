@@ -2,7 +2,9 @@
 .vscode
 
 *.js
+!/scripts/index.js
 
 /Logs
 /Downloads
 /download
+authcookie

@@ -5,12 +5,16 @@ package dl
 import (
 	"errors"
 	"fmt"
+	"imooc_downloader/config"
+	"imooc_downloader/imooc"
 	"io/ioutil"
 	"net/http"
 	"os"
 	"strconv"
 	"sync"
 	"time"
+
+	"github.com/go-resty/resty/v2"
 )
 
 type Download struct {
@@ -21,25 +25,16 @@ type Download struct {
 
 // Start the download
 func (d Download) Do() ([]byte, error) {
-	r, err := d.getNewRequest("HEAD")
-	if err != nil {
-		return nil, err
+
+	client := resty.New()
+	client.RetryCount = 3
+	resp, _ := client.R().SetHeaders(imooc.Headers).Head(d.Url)
+
+	if resp.StatusCode() > 299 {
+		return nil, errors.New(fmt.Sprintf("Can't process, response is %v", resp.StatusCode()))
 	}
 
-	client := http.Client{
-		Timeout: time.Duration(30) * time.Second,
-	}
-
-	resp, err := client.Do(r)
-	if err != nil {
-		return nil, err
-	}
-
-	if resp.StatusCode > 299 {
-		return nil, errors.New(fmt.Sprintf("Can't process, response is %v", resp.StatusCode))
-	}
-
-	size, err := strconv.Atoi(resp.Header.Get("Content-Length"))
+	size, err := strconv.Atoi(resp.Header().Get("Content-Length"))
 	if err != nil {
 		return nil, err
 	}
@@ -87,27 +82,26 @@ func (d Download) Do() ([]byte, error) {
 
 // Download a single section and save content to a tmp file
 func (d Download) downloadSection(i int, c [2]int) error {
-	r, err := d.getNewRequest("GET")
-	if err != nil {
-		return err
+
+	client := resty.New()
+	client.RetryCount = 3
+	client.SetTimeout(time.Duration(30) * time.Second)
+
+	r := client.R()
+	mergeHeaders := map[string]string{}
+	mergeHeaders["Range"] = fmt.Sprintf("bytes=%v-%v", c[0], c[1])
+	for k, v := range imooc.Headers {
+		mergeHeaders[k] = v
 	}
-	r.Header.Set("Range", fmt.Sprintf("bytes=%v-%v", c[0], c[1]))
-	client := http.Client{
-		Timeout: time.Duration(30) * time.Second,
-	}
-	resp, err := client.Do(r)
-	if err != nil {
-		return err
-	}
-	if resp.StatusCode > 299 {
-		return errors.New(fmt.Sprintf("Can't process, response is %v", resp.StatusCode))
+	resp, _ := r.SetHeaders(mergeHeaders).Get(d.Url)
+
+	if resp.StatusCode() > 299 {
+		return errors.New(fmt.Sprintf("Can't process, response is %v", resp.StatusCode()))
 	}
 
-	b, err := ioutil.ReadAll(resp.Body)
-	if err != nil {
-		return err
-	}
-	err = ioutil.WriteFile(fmt.Sprintf("section-%v.tmp", i), b, os.ModePerm)
+	body := resp.Body()
+
+	err := ioutil.WriteFile(fmt.Sprintf("section-%v.tmp", i), body, os.ModePerm)
 	if err != nil {
 		return err
 	}
@@ -124,7 +118,10 @@ func (d Download) getNewRequest(method string) (*http.Request, error) {
 	if err != nil {
 		return nil, err
 	}
-	r.Header.Set("User-Agent", "Silly Download Manager v001")
+
+	for k, v := range config.FakeHeaders {
+		r.Header.Add(k, v)
+	}
 	return r, nil
 }
 

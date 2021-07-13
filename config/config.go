@@ -5,7 +5,7 @@ var FakeHeaders = map[string]string{
 }
 
 const (
-	DECRYPT_INFO_URL = "http://34.80.19.136:58000/m3u8"
-	ENCRYPT_URL      = "http://34.80.19.136:58000/encrypt"
+	DECRYPT_INFO_URL = "http://127.0.0.1:58000/m3u8"
+	ENCRYPT_URL      = "http://127.0.0.1:58000/encrypt"
 	BROWSER_KEY      = "dd9eeccdd46ca5935707f07fef4ba2fb"
 )

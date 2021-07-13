@@ -4,6 +4,7 @@ import (
 	"errors"
 	"fmt"
 	"imooc_downloader/crawler"
+	"imooc_downloader/execEnv"
 	"imooc_downloader/imooc"
 	"regexp"
 	"strings"
@@ -13,6 +14,7 @@ import (
 
 var emailReStr string = `^[a-zA-Z0-9_-]+@[a-zA-Z0-9_-]+(\.[a-zA-Z0-9_-]+)+$`
 var phoneReStr string = `^1(3\d|4[5-8]|5[0-35-9]|6[567]|7[01345-8]|8\d|9[025-9])\d{8}$`
+var jsCodePath string = "./scripts/index.js"
 
 var accountValidate = func(input string) error {
 	trimStr := strings.Trim(input, " \n")
@@ -34,6 +36,9 @@ var pwdValidate = func(input string) error {
 }
 
 func main() {
+
+	execEnv.NewJsRuntime(jsCodePath)
+
 	accountPrompt := promptui.Prompt{
 		Label:       "账号",
 		Validate:    accountValidate,
@@ -69,16 +74,21 @@ func main() {
 		return
 	}
 
-	um := new(imooc.UserManger)
-	um.Username = acc // phone or email to login
-	um.Password = pwd
-	err = um.DoLogin()
+	err = imooc.ParserCookieFile("authcookie")
+
 	if err != nil {
-		fmt.Printf("run DoLogin failed. error: %v\n", err)
-		return
+		fmt.Printf("cookie login failed. error: %v\n", err)
+
+		um := new(imooc.UserManger)
+		um.Username = acc // phone or email to login
+		um.Password = pwd
+		err = um.DoLogin()
+		if err != nil {
+			fmt.Printf("run DoLogin failed. error: %v\n", err)
+			return
+		}
 	}
 
 	// do crawl
 	crawler.StarColly(course)
-
 }

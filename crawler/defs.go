@@ -6,11 +6,12 @@ import (
 
 type Lesson struct {
 	title   string
-	m3u8    string
+	url     string
 	chapter string
+	isWork  bool
 }
 
-type decryptMsg struct {
+type msg struct {
 	Data map[string]interface{} `json:"data"`
 }
 

@@ -5,6 +5,7 @@ import (
 	"encoding/hex"
 	"fmt"
 	"imooc_downloader/common"
+	"imooc_downloader/imooc"
 	"imooc_downloader/tools"
 	"io/ioutil"
 	"os"
@@ -13,6 +14,7 @@ import (
 	"strconv"
 	"time"
 
+	"github.com/go-resty/resty/v2"
 	"github.com/gosuri/uiprogress"
 	"github.com/grafov/m3u8"
 )
@@ -30,8 +32,10 @@ type Enginer struct {
 	dstFolder string
 }
 
+var tempFolderName = "course"
+
 func NewEnginer(course string) *Enginer {
-	return &Enginer{course: course, dstFolder: "./download"}
+	return &Enginer{course: course, dstFolder: "./"}
 }
 
 func (en *Enginer) Download(chapter, name string, mediapl *m3u8.MediaPlaylist) {
@@ -40,8 +44,8 @@ func (en *Enginer) Download(chapter, name string, mediapl *m3u8.MediaPlaylist) {
 	// 	Timeout: time.Duration(30) * time.Second,
 	// }
 
-	course, _ := filepath.Abs(filepath.Join(en.dstFolder, en.course))
-	segTemp := filepath.Join(course, chapter, name+"-"+time.Now().Format("20060102150405"))
+	course, _ := filepath.Abs(filepath.Join(en.dstFolder, tempFolderName))
+	segTemp := filepath.Join(course, chapter, name+"-"+time.Now().Format("20060102"))
 	os.MkdirAll(segTemp, os.ModePerm)
 
 	up := uiprogress.New()
@@ -90,6 +94,28 @@ func (en *Enginer) Download(chapter, name string, mediapl *m3u8.MediaPlaylist) {
 	mergeRename(segTemp)
 }
 
+// 直接保存 markdown
+func (en *Enginer) SaveAsFile(chapter, name, url string) {
+	course, _ := filepath.Abs(filepath.Join(en.dstFolder, tempFolderName))
+	segTemp := filepath.Join(course, chapter, name)
+	os.MkdirAll(filepath.Join(course, chapter), os.ModePerm)
+
+	client := resty.New()
+	client.SetCookies(imooc.AuthCookies)
+
+	resp, _ := client.R().SetHeaders(imooc.Headers).Get(url)
+
+	docInfo := new(struct {
+		Data map[string]interface{} `json:"data"`
+	})
+
+	tools.Parser(resp.Body(), docInfo)
+
+	info := docInfo.Data["media_info"].(map[string]interface{})
+	byteKey := []byte(fmt.Sprintf("%v", info["desc_md"]))
+	ioutil.WriteFile(segTemp+".md", byteKey, os.ModePerm)
+}
+
 func mergeRename(src string) {
 
 	if _, err := exec.LookPath("ffmpeg"); err == nil {
@@ -112,6 +138,7 @@ func mergeRename(src string) {
 		target := src + ".mp4"
 		cmd := exec.Command("ffmpeg",
 			"-i", "concat:"+string(line),
+			"-y",
 			"-acodec", "copy",
 			"-vcodec", "copy",
 			"-absf", "aac_adtstoasc",
@@ -129,4 +156,16 @@ func mergeRename(src string) {
 	} else {
 		fmt.Println("FFmpeg does not exist! skip merge")
 	}
+}
+
+// 处理 windows 下文件路径过长
+func prunePathLength(p string) string {
+
+	// 通过 windows api 获取长度, 这里直接写个常量值
+	if len(p) > 250 {
+
+		return p
+	}
+
+	return p
 }
